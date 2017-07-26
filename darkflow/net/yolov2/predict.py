@@ -12,9 +12,9 @@ from ...cython_utils.cy_yolo2_findboxes import box_constructor
 
 ds = True
 try :
-	from ...deep_sort.application_util import preprocessing as prep
-	from ...deep_sort.application_util import visualization
-	from ...deep_sort.deep_sort.detection import Detection
+	from deep_sort.application_util import preprocessing as prep
+	from deep_sort.application_util import visualization
+	from deep_sort.deep_sort.detection import Detection
 except :
 	ds = False
 
