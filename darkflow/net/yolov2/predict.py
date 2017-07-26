@@ -93,11 +93,7 @@ def postprocess(self,net_out, im,frame_id = 0,csv=None,mask = None,encoder=None,
 			left, right, top, bot, mess, max_indx, confidence = boxResults
 			if self.FLAGS.trackObj != mess :
 				continue
-			if self.FLAGS.tracker == "sort":
-				detections.append(np.array([left,top,right,bot]))
-			elif self.FLAGS.tracker == "deep_sort":
-				detections.append(np.array([left,top,right-left,bot-top]).astype(np.float64))
-
+			detections.append(np.array([left,top,right-left,bot-top]).astype(np.float64))
 		if len(detections) < 5  and self.FLAGS.BK_MOG:
 			detections = detections + extract_boxes(mask)
 		detections = np.array(detections)
