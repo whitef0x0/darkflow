@@ -26,7 +26,7 @@ def load_from_ckpt(self):
             load_point = load_point.split('"')[1]
             load_point = load_point.split('-')[-1]
             self.FLAGS.load = int(load_point)
-    
+
     load_point = os.path.join(self.FLAGS.backup, self.meta['name'])
     load_point = '{}-{}'.format(load_point, self.FLAGS.load)
     self.say('Loading from {}'.format(load_point))
@@ -41,10 +41,10 @@ def say(self, *msgs):
         if msg is None: continue
         print(msg)
 
-def load_old_graph(self, ckpt): 
+def load_old_graph(self, ckpt):
     ckpt_loader = create_loader(ckpt)
     self.say(old_graph_msg.format(ckpt))
-    
+
     for var in tf.global_variables():
         name = var.name.split(':')[0]
         args = [name, var.get_shape()]
@@ -68,21 +68,39 @@ def _get_fps(self, frame):
 def camera(self):
     file = self.FLAGS.demo
     SaveVideo = self.FLAGS.saveVideo
-    
+
+    if self.FLAGS.track:
+        from ..deep_sort import generate_detections
+        from ..deep_sort.deep_sort import nn_matching
+        from ..deep_sort.deep_sort.tracker import Tracker
+
+        metric = nn_matching.NearestNeighborDistanceMetric(
+        "cosine", 0.2, 100)
+        tracker = Tracker(metric)
+        encoder = generate_detections.create_box_encoder(
+            os.path.abspath("darkflow/deep_sort/resources/networks/mars-small128.ckpt-68577"))
+    if self.FLAGS.BK_MOG and self.FLAGS.track :
+        fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
+
     if file == 'camera':
         file = 0
     else:
         assert os.path.isfile(file), \
         'file {} does not exist'.format(file)
-        
+
     camera = cv2.VideoCapture(file)
-    
+
     if file == 0:
         self.say('Press [ESC] to quit demo')
-        
+
     assert camera.isOpened(), \
     'Cannot capture source'
-    
+
+    if self.FLAGS.csv :
+        f = open('{}.csv'.format(file),'w')
+        f.write('frame_id, track_id , x, y, w, h\n')
+    else :
+        f =None
     if file == 0:#camera window
         cv2.namedWindow('', 0)
         _, frame = camera.read()
@@ -101,37 +119,49 @@ def camera(self):
         else:
             fps = round(camera.get(cv2.CAP_PROP_FPS))
         videoWriter = cv2.VideoWriter(
-            'video.avi', fourcc, fps, (width, height))
+            'output_{}'.format(file), fourcc, fps, (width, height))
 
     # buffers for demo in batch
     buffer_inp = list()
     buffer_pre = list()
-    
-    elapsed = int()
+
+    elapsed = 0
     start = timer()
     self.say('Press [ESC] to quit demo')
+    #postprocessed = []
     # Loop through frames
+    n = 0
     while camera.isOpened():
         elapsed += 1
         _, frame = camera.read()
         if frame is None:
             print ('\nEnd of Video')
             break
+        if self.FLAGS.skip != n :
+            n+=1
+            continue
+        n = 0
+        if self.FLAGS.BK_MOG and self.FLAGS.track :
+            fgmask = fgbg.apply(frame)
+        else :
+            fgmask = None
         preprocessed = self.framework.preprocess(frame)
         buffer_inp.append(frame)
         buffer_pre.append(preprocessed)
-        
         # Only process and imshow when queue is full
         if elapsed % self.FLAGS.queue == 0:
             feed_dict = {self.inp: buffer_pre}
             net_out = self.sess.run(self.out, feed_dict)
             for img, single_out in zip(buffer_inp, net_out):
-                postprocessed = self.framework.postprocess(
-                    single_out, img, False)
+                if not self.FLAGS.track :
+                    postprocessed = self.framework.postprocess(
+                        single_out, img, save= False)
+                else :
+                    postprocessed = self.framework.postprocess(
+                        single_out, img,frame_id = elapsed,csv=f,mask = fgmask,encoder=encoder,tracker=tracker,save=False)
                 if SaveVideo:
                     videoWriter.write(postprocessed)
-                if file == 0: #camera window
-                    cv2.imshow('', postprocessed)
+                cv2.imshow('', postprocessed)
             # Clear Buffers
             buffer_inp = list()
             buffer_pre = list()
@@ -141,16 +171,18 @@ def camera(self):
             sys.stdout.write('{0:3.3f} FPS'.format(
                 elapsed / (timer() - start)))
             sys.stdout.flush()
-        if file == 0: #camera window
-            choice = cv2.waitKey(1)
-            if choice == 27: break
+
+        choice = cv2.waitKey(1)
+        if choice == 27:
+            break
 
     sys.stdout.write('\n')
     if SaveVideo:
         videoWriter.release()
+    if self.FLAGS.csv :
+        f.close()
     camera.release()
-    if file == 0: #camera window
-        cv2.destroyAllWindows()
+    cv2.destroyAllWindows()
 
 def to_darknet(self):
     darknet_ckpt = self.darknet
