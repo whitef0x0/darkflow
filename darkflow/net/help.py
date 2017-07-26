@@ -70,9 +70,9 @@ def camera(self):
     SaveVideo = self.FLAGS.saveVideo
 
     if self.FLAGS.track:
-        from ..deep_sort import generate_detections
-        from ..deep_sort.deep_sort import nn_matching
-        from ..deep_sort.deep_sort.tracker import Tracker
+        from deep_sort import generate_detections
+        from deep_sort.deep_sort import nn_matching
+        from deep_sort.deep_sort.tracker import Tracker
 
         metric = nn_matching.NearestNeighborDistanceMetric(
         "cosine", 0.2, 100)
