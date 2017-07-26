@@ -12,7 +12,7 @@ def cliHandler(args):
         for d in dirs:
             this = os.path.abspath(os.path.join(os.path.curdir, d))
             if not os.path.exists(this): os.makedirs(this)
-    _get_dir([FLAGS.imgdir, FLAGS.binary, FLAGS.backup, 
+    _get_dir([FLAGS.imgdir, FLAGS.binary, FLAGS.backup,
              os.path.join(FLAGS.imgdir,'out'), FLAGS.summary])
 
     # fix FLAGS.load to appropriate type
@@ -20,14 +20,14 @@ def cliHandler(args):
     except: pass
 
     tfnet = TFNet(FLAGS)
-    
+
     if FLAGS.demo:
         tfnet.camera()
         exit('Demo stopped, exit.')
 
     if FLAGS.train:
         print('Enter training ...'); tfnet.train()
-        if not FLAGS.savepb: 
+        if not FLAGS.savepb:
             exit('Training finished, exit.')
 
     if FLAGS.savepb:
