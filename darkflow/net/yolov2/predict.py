@@ -73,11 +73,12 @@ def postprocess(self,net_out, im,frame_id = 0,csv=None,mask = None,encoder=None,
 			if self.FLAGS.json:
 				resultsForJSON.append({"label": mess, "confidence": float('%.2f' % confidence), "topleft": {"x": left, "y": top}, "bottomright": {"x": right, "y": bot}})
 				continue
-			cv2.rectangle(imgcv,
-				(left, top), (right, bot),
-				colors[max_indx], thick)
-			cv2.putText(imgcv, mess, (left, top - 12),
-				0, 1e-3 * h, colors[max_indx],thick//3)
+			if self.FLAGS.display :
+				cv2.rectangle(imgcv,
+					(left, top), (right, bot),
+					colors[max_indx], thick)
+				cv2.putText(imgcv, mess, (left, top - 12),
+					0, 1e-3 * h, colors[max_indx],thick//3)
 	else :
 		if not ds :
 			print("ERROR : deep sort submodule not found for tracking please run :")
@@ -120,14 +121,16 @@ def postprocess(self,net_out, im,frame_id = 0,csv=None,mask = None,encoder=None,
 			id_num = str(track.track_id)
 			if self.FLAGS.csv:
 				csv.write('{}, {}, {}, {}, {}, {}\n'.format(frame_id,id_num,int(bbox[0]),int(bbox[1]),int(bbox[2])-int(bbox[0]),int(bbox[3])-int(bbox[1])))
-			cv2.rectangle(imgcv, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),
-					        (255,255,255), thick//3)
-			cv2.putText(imgcv, id_num,(int(bbox[0]), int(bbox[1]) - 12),0, 1e-3 * h, (255,255,255),thick//6)
-		for det in detections :
-			left,top,right,bot = int(det[0]),int(det[1]),int(det[2]+det[0]),int(det[3]+det[1])
-			cv2.rectangle(imgcv,
-				(left, top), (right, bot),
-				(0,0,255), thick//3)
+			if self.FLAGS.display :
+				cv2.rectangle(imgcv, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),
+						        (255,255,255), thick//3)
+				cv2.putText(imgcv, id_num,(int(bbox[0]), int(bbox[1]) - 12),0, 1e-3 * h, (255,255,255),thick//6)
+		if self.FLAGS.display :
+			for det in detections :
+				left,top,right,bot = int(det[0]),int(det[1]),int(det[2]+det[0]),int(det[3]+det[1])
+				cv2.rectangle(imgcv,
+					(left, top), (right, bot),
+					(0,0,255), thick//3)
 	if not save: return imgcv
 
 	outfolder = os.path.join(self.FLAGS.imgdir, 'out')

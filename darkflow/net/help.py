@@ -161,7 +161,8 @@ def camera(self):
                         single_out, img,frame_id = elapsed,csv=f,mask = fgmask,encoder=encoder,tracker=tracker,save=False)
                 if SaveVideo:
                     videoWriter.write(postprocessed)
-                cv2.imshow('', postprocessed)
+                if self.FLAGS.display :
+                    cv2.imshow('', postprocessed)
             # Clear Buffers
             buffer_inp = list()
             buffer_pre = list()
@@ -171,10 +172,10 @@ def camera(self):
             sys.stdout.write('{0:3.3f} FPS'.format(
                 elapsed / (timer() - start)))
             sys.stdout.flush()
-
-        choice = cv2.waitKey(1)
-        if choice == 27:
-            break
+        if self.FLAGS.display :
+            choice = cv2.waitKey(1)
+            if choice == 27:
+                break
 
     sys.stdout.write('\n')
     if SaveVideo:
@@ -182,7 +183,8 @@ def camera(self):
     if self.FLAGS.csv :
         f.close()
     camera.release()
-    cv2.destroyAllWindows()
+    if self.FLAGS.display :
+        cv2.destroyAllWindows()
 
 def to_darknet(self):
     darknet_ckpt = self.darknet
