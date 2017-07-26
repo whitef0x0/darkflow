@@ -4,6 +4,8 @@ import numpy as np
 import cv2
 import os
 import json
+import sys
+import pyximport; pyximport.install()
 from ...cython_utils.cy_yolo_findboxes import yolo_box_constructor
 
 def _fix(obj, dims, scale, offs):
@@ -40,10 +42,10 @@ def process_box(self, b, h, w, threshold):
 def findboxes(self, net_out):
 	meta, FLAGS = self.meta, self.FLAGS
 	threshold = FLAGS.threshold
-	
+
 	boxes = []
 	boxes = yolo_box_constructor(meta, net_out, threshold)
-	
+
 	return boxes
 
 def preprocess(self, im, allobj = None):
@@ -95,6 +97,10 @@ def postprocess(self, net_out, im, save = True):
 		if boxResults is None:
 			continue
 		left, right, top, bot, mess, max_indx, confidence = boxResults
+		print(mess)
+		if FLAGS.track and mess != "person":
+			print(mess)
+			continue
 		thick = int((h + w) // 300)
 		if self.FLAGS.json:
 			resultsForJSON.append({"label": mess, "confidence": float('%.2f' % confidence), "topleft": {"x": left, "y": top}, "bottomright": {"x": right, "y": bot}})
@@ -118,6 +124,6 @@ def postprocess(self, net_out, im, save = True):
 		textFile = os.path.splitext(img_name)[0] + ".json"
 		with open(textFile, 'w') as f:
 			f.write(textJSON)
-		return	
+		return
 
 	cv2.imwrite(img_name, imgcv)
