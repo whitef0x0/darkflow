@@ -78,7 +78,7 @@ def camera(self):
         "cosine", 0.2, 100)
         tracker = Tracker(metric)
         encoder = generate_detections.create_box_encoder(
-            os.path.abspath("darkflow/deep_sort/resources/networks/mars-small128.ckpt-68577"))
+            os.path.abspath("deep_sort/resources/networks/mars-small128.ckpt-68577"))
     if self.FLAGS.BK_MOG and self.FLAGS.track :
         fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
 
