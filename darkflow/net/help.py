@@ -91,7 +91,7 @@ def camera(self):
     camera = cv2.VideoCapture(file)
 
     if file == 0:
-        self.say('Press [ESC] to quit demo')
+        self.say('Press [ESC] to quit video')
 
     assert camera.isOpened(), \
     'Cannot capture source'
