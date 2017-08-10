@@ -80,7 +80,7 @@ def camera(self):
             encoder = generate_detections.create_box_encoder(
                 os.path.abspath("deep_sort/resources/networks/mars-small128.ckpt-68577"))
         elif self.FLAGS.tracker == "sort":
-            from sort.sort import *
+            from sort.sort import Sort
             encoder = None
             tracker = Sort()
     if self.FLAGS.BK_MOG and self.FLAGS.track :
