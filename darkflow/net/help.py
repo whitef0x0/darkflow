@@ -69,16 +69,20 @@ def camera(self):
     file = self.FLAGS.demo
     SaveVideo = self.FLAGS.saveVideo
 
-    if self.FLAGS.track:
-        from deep_sort import generate_detections
-        from deep_sort.deep_sort import nn_matching
-        from deep_sort.deep_sort.tracker import Tracker
-
-        metric = nn_matching.NearestNeighborDistanceMetric(
-        "cosine", 0.2, 100)
-        tracker = Tracker(metric)
-        encoder = generate_detections.create_box_encoder(
-            os.path.abspath("deep_sort/resources/networks/mars-small128.ckpt-68577"))
+    if self.FLAGS.track :
+        if self.FLAGS.tracker == "deep_sort":
+            from deep_sort import generate_detections
+            from deep_sort.deep_sort import nn_matching
+            from deep_sort.deep_sort.tracker import Tracker
+            metric = nn_matching.NearestNeighborDistanceMetric(
+            "cosine", 0.2, 100)
+            tracker = Tracker(metric)
+            encoder = generate_detections.create_box_encoder(
+                os.path.abspath("deep_sort/resources/networks/mars-small128.ckpt-68577"))
+        elif self.FLAGS.tracker == "sort":
+            from sort.sort import *
+            encoder = None
+            tracker = Sort()
     if self.FLAGS.BK_MOG and self.FLAGS.track :
         fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
 

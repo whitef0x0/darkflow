@@ -41,6 +41,7 @@ class argHandler(dict):
         self.define('skip', 0, 'skip frames')
         self.define('csv', False, 'write csv of predictions')
         self.define('display', True, 'whether to display or not')
+        self.define('tracker', "sort", 'which tracker to use')
     def define(self, argName, default, description):
         self[argName] = default
         self._descriptions[argName] = description
