@@ -8,6 +8,7 @@ import numpy as np
 import sys
 import cv2
 import os
+import csv
 
 old_graph_msg = 'Resolving old graph def {} (no guarantee)'
 
@@ -101,10 +102,13 @@ def camera(self):
     'Cannot capture source'
 
     if self.FLAGS.csv :
-        f = open('{}.csv'.format(file),'w')
-        f.write('frame_id, track_id , x, y, w, h\n')
+        f = open('{}.csv'.format(file),'wb')
+        writer = csv.writer(f, delimiter=',')
+        writer.writerow(['frame_id', 'track_id' , 'x', 'y', 'w', 'h'])
+        f.flush()
     else :
         f =None
+        writer= None
     if file == 0:#camera window
         cv2.namedWindow('', 0)
         _, frame = camera.read()
@@ -162,7 +166,7 @@ def camera(self):
                         single_out, img, save= False)
                 else :
                     postprocessed = self.framework.postprocess(
-                        single_out, img,frame_id = elapsed,csv=f,mask = fgmask,encoder=encoder,tracker=tracker,save=False)
+                        single_out, img,frame_id = elapsed,csv_file=f,csv=writer,mask = fgmask,encoder=encoder,tracker=tracker,save=False)
                 if SaveVideo:
                     videoWriter.write(postprocessed)
                 if self.FLAGS.display :

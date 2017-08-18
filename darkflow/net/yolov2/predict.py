@@ -47,7 +47,7 @@ def extract_boxes(new_im):
         if w*h > 30**2 and ((w < new_im.shape[0] and h <= new_im.shape[1]) or (w <= new_im.shape[0] and h < new_im.shape[1])):
             cont.append([x, y, w, h])
     return cont
-def postprocess(self,net_out, im,frame_id = 0,csv=None,mask = None,encoder=None,tracker=None, save = False):
+def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None,encoder=None,tracker=None, save = False):
 	"""
 	Takes net output, draw net_out, save to disk
 	"""
@@ -130,7 +130,8 @@ def postprocess(self,net_out, im,frame_id = 0,csv=None,mask = None,encoder=None,
 				bbox = [int(track[0]),int(track[1]),int(track[2]),int(track[3])]
 				id_num = str(int(track[4]))
 			if self.FLAGS.csv:
-				csv.write('{}, {}, {}, {}, {}, {}\n'.format(frame_id,id_num,int(bbox[0]),int(bbox[1]),int(bbox[2])-int(bbox[0]),int(bbox[3])-int(bbox[1])))
+				csv.writerow([frame_id,id_num,int(bbox[0]),int(bbox[1]),int(bbox[2])-int(bbox[0]),int(bbox[3])-int(bbox[1])])
+		        csv_file.flush()
 			if self.FLAGS.display :
 				cv2.rectangle(imgcv, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),
 						        (255,255,255), thick//3)
