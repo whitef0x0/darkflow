@@ -102,7 +102,7 @@ def camera(self):
     'Cannot capture source'
 
     if self.FLAGS.csv :
-        f = open('{}.csv'.format(file),'wb')
+        f = open('{}.csv'.format(file),'w')
         writer = csv.writer(f, delimiter=',')
         writer.writerow(['frame_id', 'track_id' , 'x', 'y', 'w', 'h'])
         f.flush()

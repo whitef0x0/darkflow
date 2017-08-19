@@ -131,7 +131,7 @@ def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None
 				id_num = str(int(track[4]))
 			if self.FLAGS.csv:
 				csv.writerow([frame_id,id_num,int(bbox[0]),int(bbox[1]),int(bbox[2])-int(bbox[0]),int(bbox[3])-int(bbox[1])])
-		        csv_file.flush()
+				csv_file.flush()
 			if self.FLAGS.display :
 				cv2.rectangle(imgcv, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),
 						        (255,255,255), thick//3)
