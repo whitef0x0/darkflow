@@ -75,7 +75,7 @@ def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None
 			if self.FLAGS.json:
 				resultsForJSON.append({"label": mess, "confidence": float('%.2f' % confidence), "topleft": {"x": left, "y": top}, "bottomright": {"x": right, "y": bot}})
 				continue
-			if self.FLAGS.display :
+			if self.FLAGS.display or save:
 				cv2.rectangle(imgcv,
 					(left, top), (right, bot),
 					colors[max_indx], thick)
@@ -132,7 +132,7 @@ def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None
 			if self.FLAGS.csv:
 				csv.writerow([frame_id,id_num,int(bbox[0]),int(bbox[1]),int(bbox[2])-int(bbox[0]),int(bbox[3])-int(bbox[1])])
 				csv_file.flush()
-			if self.FLAGS.display :
+			if self.FLAGS.display or save:
 				cv2.rectangle(imgcv, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),
 						        (255,255,255), thick//3)
 				cv2.putText(imgcv, id_num,(int(bbox[0]), int(bbox[1]) - 12),0, 1e-3 * h, (255,255,255),thick//6)
