@@ -63,7 +63,7 @@ def _get_fps(self, frame):
     preprocessed = self.framework.preprocess(frame)
     feed_dict = {self.inp: [preprocessed]}
     net_out = self.sess.run(self.out, feed_dict)[0]
-    processed = self.framework.postprocess(net_out, frame, False)
+    processed = self.framework.postprocess(net_out, frame)
     return timer() - start
 
 def camera(self):
@@ -163,10 +163,12 @@ def camera(self):
             for img, single_out in zip(buffer_inp, net_out):
                 if not self.FLAGS.track :
                     postprocessed = self.framework.postprocess(
-                        single_out, img, save= False)
+                        single_out, img)
                 else :
                     postprocessed = self.framework.postprocess(
-                        single_out, img,frame_id = elapsed,csv_file=f,csv=writer,mask = fgmask,encoder=encoder,tracker=tracker,save=False)
+                        single_out, img,frame_id = elapsed,
+                        csv_file=f,csv=writer,mask = fgmask,
+                        encoder=encoder,tracker=tracker)
                 if SaveVideo:
                     videoWriter.write(postprocessed)
                 if self.FLAGS.display :
