@@ -47,7 +47,7 @@ def extract_boxes(new_im):
         if w*h > 30**2 and ((w < new_im.shape[0] and h <= new_im.shape[1]) or (w <= new_im.shape[0] and h < new_im.shape[1])):
             cont.append([x, y, w, h])
     return cont
-def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None,encoder=None,tracker=None, save = False):
+def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None,encoder=None,tracker=None):
 	"""
 	Takes net output, draw net_out, save to disk
 	"""
@@ -75,7 +75,7 @@ def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None
 			if self.FLAGS.json:
 				resultsForJSON.append({"label": mess, "confidence": float('%.2f' % confidence), "topleft": {"x": left, "y": top}, "bottomright": {"x": right, "y": bot}})
 				continue
-			if self.FLAGS.display or save:
+			if self.FLAGS.display or self.FLAGS.saveVideo:
 				cv2.rectangle(imgcv,
 					(left, top), (right, bot),
 					colors[max_indx], thick)
@@ -132,19 +132,8 @@ def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None
 			if self.FLAGS.csv:
 				csv.writerow([frame_id,id_num,int(bbox[0]),int(bbox[1]),int(bbox[2])-int(bbox[0]),int(bbox[3])-int(bbox[1])])
 				csv_file.flush()
-			if self.FLAGS.display or save:
+			if self.FLAGS.display or self.FLAGS.saveVideo:
 				cv2.rectangle(imgcv, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),
 						        (255,255,255), thick//3)
 				cv2.putText(imgcv, id_num,(int(bbox[0]), int(bbox[1]) - 12),0, 1e-3 * h, (255,255,255),thick//6)
-	if not save: return imgcv
-
-	outfolder = os.path.join(self.FLAGS.imgdir, 'out')
-	img_name = os.path.join(outfolder, os.path.basename(im))
-	if self.FLAGS.json:
-		textJSON = json.dumps(resultsForJSON)
-		textFile = os.path.splitext(img_name)[0] + ".json"
-		with open(textFile, 'w') as f:
-			f.write(textJSON)
-		return
-
-	cv2.imwrite(img_name, imgcv)
+	return imgcv
