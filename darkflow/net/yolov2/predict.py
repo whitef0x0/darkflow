@@ -35,7 +35,7 @@ def findboxes(self, net_out):
 	return boxes
 
 
-def extract_boxes(new_im):
+def extract_boxes(self,new_im):
     cont = []
     new_im=new_im.astype(np.uint8)
     ret, thresh=cv2.threshold(new_im, 127, 255, 0)
@@ -45,7 +45,9 @@ def extract_boxes(new_im):
         cnt=contours[i]
         x, y, w, h=cv2.boundingRect(cnt)
         if w*h > 30**2 and ((w < new_im.shape[0] and h <= new_im.shape[1]) or (w <= new_im.shape[0] and h < new_im.shape[1])):
-            cont.append([x, y, w, h])
+            if self.FLAGS.tracker == "sort":
+                cont.append([x, y, x+w, y+h])
+            else : cont.append([x, y, x, y])
     return cont
 def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None,encoder=None,tracker=None):
 	"""
@@ -101,8 +103,8 @@ def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None
 				scores.append(confidence)
 			elif self.FLAGS.tracker == "sort":
 				detections.append(np.array([left,top,right,bot]).astype(np.float64))
-		if len(detections) < 5  and self.FLAGS.BK_MOG:
-			detections = detections + extract_boxes(mask)
+		if len(detections) < 3  and self.FLAGS.BK_MOG:
+			detections = detections + extract_boxes(self,mask)
 		detections = np.array(detections)
 		if self.FLAGS.tracker == "deep_sort":
 			scores = np.array(scores)
