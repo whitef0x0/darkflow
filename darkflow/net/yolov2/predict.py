@@ -107,6 +107,8 @@ def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None
 			detections = detections + extract_boxes(self,mask)
 
 		detections = np.array(detections)
+		if detections.shape[0] == 0 :
+			return imgcv
 		if self.FLAGS.tracker == "deep_sort":
 			scores = np.array(scores)
 			features = encoder(imgcv, detections.copy())
