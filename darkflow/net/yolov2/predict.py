@@ -47,7 +47,7 @@ def extract_boxes(self,new_im):
         if w*h > 30**2 and ((w < new_im.shape[0] and h <= new_im.shape[1]) or (w <= new_im.shape[0] and h < new_im.shape[1])):
             if self.FLAGS.tracker == "sort":
                 cont.append([x, y, x+w, y+h])
-            else : cont.append([x, y, x, y])
+            else : cont.append([x, y, w, h])
     return cont
 def postprocess(self,net_out, im,frame_id = 0,csv_file=None,csv=None,mask = None,encoder=None,tracker=None):
 	"""
