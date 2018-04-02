@@ -70,8 +70,8 @@ def _get_fps(self, frame):
     processed = self.framework.postprocess(net_out, frame)
     return timer() - start
 
-def camera(self):
-    file = self.FLAGS.demo
+def takeVideo(self, stop_video):
+    file = 'camera'
 
     if self.FLAGS.track :
         if self.FLAGS.tracker == "deep_sort":
@@ -151,7 +151,7 @@ def camera(self):
             socketIO.emit('video_data_point', socketio_json)
 
     frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    while camera.isOpened():
+    while stop_video() is False:
         elapsed += 1
         _, frame = camera.read()
 
@@ -200,10 +200,6 @@ def camera(self):
             sys.stdout.write('{0:3.3f} FPS'.format(
                 elapsed / (timer() - start)))
             sys.stdout.flush()
-        if self.FLAGS.display :
-            choice = cv2.waitKey(1)
-            if choice == 27:
-                break
 
     if self.FLAGS.upload:
         socketio_json = {
@@ -229,7 +225,6 @@ def camera(self):
 
     if self.FLAGS.csv :
         f.close()
-    camera.release()
     if self.FLAGS.display :
         cv2.destroyAllWindows()
 
