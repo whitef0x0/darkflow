@@ -70,7 +70,7 @@ def _get_fps(self, frame):
     processed = self.framework.postprocess(net_out, frame)
     return timer() - start
 
-def takeVideo(self, stop_video):
+def camera(self):
     file = 'camera'
 
     if self.FLAGS.track :
@@ -84,9 +84,9 @@ def takeVideo(self, stop_video):
             encoder = generate_detections.create_box_encoder(
                 os.path.abspath("deep_sort/resources/networks/mars-small128.ckpt-68577"))
         elif self.FLAGS.tracker == "sort":
-            from sort.sort import Sort
+            from sort import sort
             encoder = None
-            tracker = Sort()
+            tracker = sort.Sort()
     if self.FLAGS.BK_MOG and self.FLAGS.track :
         fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
 
@@ -151,7 +151,7 @@ def takeVideo(self, stop_video):
             socketIO.emit('video_data_point', socketio_json)
 
     frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    while stop_video() is False:
+    while camera.isOpened():
         elapsed += 1
         _, frame = camera.read()
 
