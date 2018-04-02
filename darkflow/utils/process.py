@@ -57,6 +57,10 @@ def parser(model):
 		meta['anchors'] = anchors
 	meta['model'] = model # path to cfg, not model name
 	meta['inp_size'] = [h, w, c]
+
+	#TODO: remove this
+	print("inp_size: " + "[%s]" % ", ".join(map(str, meta['inp_size'])))
+
 	return layers, meta
 
 def cfg_yielder(model, binary):

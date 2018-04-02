@@ -4,6 +4,8 @@ import numpy as np
 import tensorflow as tf
 import pickle
 from multiprocessing.pool import ThreadPool
+import uuid
+from socketIO_client import SocketIO, LoggingNamespace
 
 train_stats = (
     'Training statistics: \n'
@@ -136,10 +138,12 @@ def predict(self):
 
         # Post processing
         self.say('Post processing {} inputs ...'.format(len(inp_feed)))
+        video_id=uuid.uuid4()
         start = time.time()
+
         pool.map(lambda p: (lambda i, prediction:
             self.framework.postprocess(
-               prediction, os.path.join(inp_path, this_batch[i])))(*p),
+               prediction, video_id, os.path.join(inp_path, this_batch[i])))(*p),
             enumerate(out))
         stop = time.time(); last = stop - start
 

@@ -42,6 +42,13 @@ class argHandler(dict):
         self.define('csv', False, 'write csv of predictions')
         self.define('display', True, 'whether to display or not')
         self.define('tracker', "sort", 'which tracker to use')
+
+        self.define('grayscale', False, 'whether to read images from webcam as black and white')
+        self.define('speech', False, 'whether to use text to speech for object labels')
+        self.define('upload', False, 'whether to upload video and labels to AWS server')
+        self.define('sidewalk_detection', False, 'whether to detect sidewalk')
+        self.define('face_recognition', False, 'whether to detect faces')
+
     def define(self, argName, default, description):
         self[argName] = default
         self._descriptions[argName] = description

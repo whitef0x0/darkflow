@@ -31,6 +31,12 @@ class YOLO(framework):
     findboxes = yolo.predict.findboxes
     process_box = yolo.predict.process_box
 
+    detect_face = yolov2.predict.detect_face
+    recognize_face = yolov2.predict.recognize_face
+    get_label_for_person = yolov2.predict.get_label_for_person
+    put_label_on_face = yolov2.predict.put_label_on_face
+    background_subtraction = yolov2.predict.background_subtraction
+
 class YOLOv2(framework):
     constructor = yolo.constructor
     parse = yolo.data.parse
@@ -43,6 +49,12 @@ class YOLOv2(framework):
     resize_input = yolo.predict.resize_input
     findboxes = yolov2.predict.findboxes
     process_box = yolo.predict.process_box
+
+    detect_face = yolov2.predict.detect_face
+    recognize_face = yolov2.predict.recognize_face
+    get_label_for_person = yolov2.predict.get_label_for_person
+    put_label_on_face = yolov2.predict.put_label_on_face
+    background_subtraction = yolov2.predict.background_subtraction
 
 """
 framework factory

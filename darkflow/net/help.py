@@ -9,6 +9,10 @@ import sys
 import cv2
 import os
 import csv
+import uuid
+import requests
+import time
+from socketIO_client import SocketIO, LoggingNamespace
 
 old_graph_msg = 'Resolving old graph def {} (no guarantee)'
 
@@ -68,7 +72,6 @@ def _get_fps(self, frame):
 
 def camera(self):
     file = self.FLAGS.demo
-    SaveVideo = self.FLAGS.saveVideo
 
     if self.FLAGS.track :
         if self.FLAGS.tracker == "deep_sort":
@@ -94,6 +97,8 @@ def camera(self):
         'file {} does not exist'.format(file)
 
     camera = cv2.VideoCapture(file)
+    camera.set(3,960)
+    camera.set(4,540)
 
     if file == 0:
         self.say('Press [ESC] to quit video')
@@ -109,7 +114,8 @@ def camera(self):
     else :
         f =None
         writer= None
-    if file == 0:#camera window
+
+    if file == 0: #camera window
         cv2.namedWindow('', 0)
         _, frame = camera.read()
         height, width, _ = frame.shape
@@ -118,16 +124,8 @@ def camera(self):
         _, frame = camera.read()
         height, width, _ = frame.shape
 
-    if SaveVideo:
-        fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        if file == 0:#camera window
-          fps = 1 / self._get_fps(frame)
-          if fps < 1:
-            fps = 1
-        else:
-            fps = round(camera.get(cv2.CAP_PROP_FPS))
-        videoWriter = cv2.VideoWriter(
-            'output_{}'.format(file), fourcc, fps, (width, height))
+    if self.FLAGS.saveVideo:
+        videoWriter = cv2.VideoWriter('output_video.mov', -1, 2, (width, height))
 
     # buffers for demo in batch
     buffer_inp = list()
@@ -136,18 +134,37 @@ def camera(self):
     elapsed = 0
     start = timer()
     self.say('Press [ESC] to quit demo')
-    #postprocessed = []
+
     # Loop through frames
     n = 0
+    video_id = str(uuid.uuid4())
+
+    if self.FLAGS.upload:
+        socketio_json = {
+            "isStart": True,
+            "isEnd": False,
+            "timestamp": int(round(time.time())),
+            "video_id": video_id,
+            "actions": []
+        }
+        with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 8080, LoggingNamespace) as socketIO:
+            socketIO.emit('video_data_point', socketio_json)
+
+    frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     while camera.isOpened():
         elapsed += 1
         _, frame = camera.read()
+
         if frame is None:
             print ('\nEnd of Video')
             break
         if self.FLAGS.skip != n :
             n+=1
             continue
+
+        previous_frame = frame_grayscale
+        frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
         n = 0
         if self.FLAGS.BK_MOG and self.FLAGS.track :
             fgmask = fgbg.apply(frame)
@@ -161,17 +178,18 @@ def camera(self):
             feed_dict = {self.inp: buffer_pre}
             net_out = self.sess.run(self.out, feed_dict)
             for img, single_out in zip(buffer_inp, net_out):
-                if not self.FLAGS.track :
+                if not self.FLAGS.track:
                     postprocessed = self.framework.postprocess(
                         single_out, img)
-                else :
+                else:
                     postprocessed = self.framework.postprocess(
-                        single_out, img,frame_id = elapsed,
-                        csv_file=f,csv=writer,mask = fgmask,
-                        encoder=encoder,tracker=tracker)
-                if SaveVideo:
+                        single_out, img, video_id, frame_id=elapsed,
+                        csv_file=f, csv=writer, mask=fgmask,
+                        encoder=encoder, tracker=tracker, previous_frame=previous_frame)
+                if self.FLAGS.saveVideo:
                     videoWriter.write(postprocessed)
-                if self.FLAGS.display :
+
+                if self.FLAGS.display:
                     cv2.imshow('', postprocessed)
             # Clear Buffers
             buffer_inp = list()
@@ -187,9 +205,28 @@ def camera(self):
             if choice == 27:
                 break
 
+    if self.FLAGS.upload:
+        socketio_json = {
+            "isStart": False,
+            "isEnd": True,
+            "timestamp": int(round(time.time())),
+            "video_id": video_id,
+            "actions": []
+        }
+        with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 8080, LoggingNamespace) as socketIO:
+            socketIO.emit('video_data_point', socketio_json)
+
     sys.stdout.write('\n')
-    if SaveVideo:
+
+    if self.FLAGS.saveVideo:
         videoWriter.release()
+
+    if self.FLAGS.upload:
+        url = 'http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com:8080/video_stream/' + video_id
+        files = {'file': open('output_video.mov', 'rb')}
+        r = requests.post(url, files=files)
+        os.remove('output_video.mov')
+
     if self.FLAGS.csv :
         f.close()
     camera.release()

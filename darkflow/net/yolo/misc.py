@@ -8,14 +8,19 @@ labels20 = ["aeroplane", "bicycle", "bird", "boat", "bottle",
     "horse", "motorbike", "person", "pottedplant", "sheep", "sofa",
     "train", "tvmonitor"]
 
+labelsVOC_smaller = ["bicycle", "bird", "bottle",
+    "bus", "car", "cat", "chair", "diningtable", "dog", "motorbike", "person", "sofa"]
+
 # 8, 14, 15, 19
 
 voc_models = ['yolo-full', 'yolo-tiny', 'yolo-small',  # <- v1
               'yolov1', 'tiny-yolov1', # <- v1.1
-              'tiny-yolo-voc', 'yolo-voc'] # <- v2
+              'tiny-yolo-voc', 'yolo-voc', 'tiny-yolo-voc_reduced', 'cpuNet'] # <- v2
 
 coco_models = ['tiny-coco', 'yolo-coco',  # <- v1.1
                'yolo', 'tiny-yolo'] # <- v2
+
+voc_smaller_models = ['tiny-yolo-voc_smaller'] 
 
 coco_names = 'coco.names'
 nine_names = '9k.names'
@@ -25,6 +30,9 @@ def labels(meta, FLAGS):
     if model in voc_models:
         print("Model has a VOC model name, loading VOC labels.")
         meta['labels'] = labels20
+    elif model in voc_smaller_models:
+        print("Model has a VOC_smaller model name, loading VOC_smaller labels.")
+        meta['labels'] = labelsVOC_smaller
     else:
         file = FLAGS.labels
         if model in coco_models:

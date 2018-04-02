@@ -8,6 +8,7 @@ from .framework import create_framework
 from ..dark.darknet import Darknet
 import json
 import os
+import numpy as np
 
 class TFNet(object):
 
@@ -101,6 +102,12 @@ class TFNet(object):
 		verbalise = self.FLAGS.verbalise
 
 		# Placeholders
+		#if self.FLAGS.grayscale:
+			#TODO: remove this
+			#print("before self.meta['inp_size'].shape: [%s]" % ", ".join(map(str, self.meta['inp_size'])))
+			#self.meta['inp_size'] = self.meta['inp_size'][:len(self.meta['inp_size'])-1]
+			#TODO: remove this
+			#print("after self.meta['inp_size'].shape: [%s]" % ", ".join(map(str, self.meta['inp_size'])))
 		inp_size = [None] + self.meta['inp_size']
 		self.inp = tf.placeholder(tf.float32, inp_size, 'input')
 		self.feed = dict() # other placeholders
