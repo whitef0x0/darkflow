@@ -72,6 +72,8 @@ def _get_fps(self, frame):
     return timer() - start
 
 def setup_camera(self):
+    self.video_id = str(uuid.uuid4())
+
     if self.FLAGS.track :
         if self.FLAGS.tracker == "deep_sort":
             from deep_sort import generate_detections
@@ -116,7 +118,6 @@ def setup_camera(self):
 
     self.elapsed = 0
     self.fps_start = timer()
-    self.video_id = str(uuid.uuid4())
 
     if self.FLAGS.upload:
         socketio_json = {
@@ -169,6 +170,7 @@ def process_frame(self):
         feed_dict = {self.inp: self.buffer_pre}
         net_out = self.sess.run(self.out, feed_dict)
         for img, single_out in zip(self.buffer_inp, net_out):
+            postprocessed = None
             if not self.FLAGS.track:
                 postprocessed = self.framework.postprocess(
                     single_out, img)
@@ -184,8 +186,6 @@ def process_frame(self):
                 time_elapsed = (end - start) / 1000
                 #TODO: remove this
                 #print("self.framework.postprocess(...) took: {}".format(time_elapsed))
-            if self.FLAGS.display:
-                cv2.imshow('LiveFeed', postprocessed)
 
             if self.FLAGS.saveVideo:
                 start = current_milli_time()
@@ -196,6 +196,9 @@ def process_frame(self):
                 time_elapsed = (end - start) / 1000
                 #TODO: remove this
                 #print("videoWriter.write(postprocessed) took: {}".format(time_elapsed))
+
+            if self.FLAGS.display:
+                cv2.imshow('LiveFeed', postprocessed)
 
         # Clear Buffers
         self.buffer_inp = list()
@@ -249,7 +252,7 @@ def teardown_camera(self):
     if self.FLAGS.display :
         cv2.destroyAllWindows()
 
-def start_video(self, start_camera):
+def camera(self):
     if self.FLAGS.track :
         if self.FLAGS.tracker == "deep_sort":
             from deep_sort import generate_detections
@@ -288,7 +291,7 @@ def start_video(self, start_camera):
     cv2.resizeWindow('LiveFeed', width, height)
 
     if self.FLAGS.saveVideo:
-        self.videoWriter = cv2.VideoWriter('output_video.mov', -1, 2, (width, height))
+        videoWriter = cv2.VideoWriter('output_video.mov', -1, 2, (width, height))
 
     # buffers for demo in batch
     buffer_inp = list()
@@ -310,7 +313,7 @@ def start_video(self, start_camera):
             "video_id": video_id,
             "actions": []
         }
-        with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 8080, LoggingNamespace) as socketIO:
+        with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 80, LoggingNamespace) as socketIO:
             socketIO.emit('video_data_point', socketio_json)
 
     frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -319,7 +322,7 @@ def start_video(self, start_camera):
         _, frame = camera.read()
 
         if frame is None:
-            print ('\nEnd of Video')
+            #print ('\nEnd of Video')
             break
         if self.FLAGS.skip != n :
             n+=1
@@ -403,7 +406,7 @@ def start_video(self, start_camera):
             "video_id": video_id,
             "actions": []
         }
-        with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 8080, LoggingNamespace) as socketIO:
+        with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 80, LoggingNamespace) as socketIO:
             socketIO.emit('video_data_point', socketio_json)
 
     sys.stdout.write('\n')
@@ -412,10 +415,10 @@ def start_video(self, start_camera):
         videoWriter.release()
 
     if self.FLAGS.upload:
-        url = 'http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com:8080/video_stream/' + video_id
+        url = 'http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com/video_stream/' + video_id
         files = {'file': open('output_video.mov', 'rb')}
         r = requests.post(url, files=files)
-        os.remove('output_video.mov')
+        #os.remove('output_video.mov')
 
     camera.release()
     if self.FLAGS.csv :

@@ -74,7 +74,6 @@ tracked_objects = {}
 
 def object_detection_speech(speech_flag, new_objects, old_objects, height, width):
     object_changes = find_object_changes(old_objects, new_objects)
-    print("generated object_changes")
     return speak_object_changes(speech_flag, object_changes, height, width)
 
 def find_object_changes(old_objects, new_objects):
@@ -119,7 +118,7 @@ def get_object_position_words(bBox, height, width):
         position_words += "left "
     else:
         centered = True
-        position_words += "center"
+        position_words += "center "
 
     if bBox["bottomright"]["y"] < (height/2):
         #Object is on top side
@@ -157,17 +156,14 @@ def speak_object_changes(speech_flag, object_changes, height, width):
         speech_out_array.append(speech_out_str)
     
     output_array = []
-    print("len(speech_out_array): " + str(len(speech_out_array)))
     for speech in speech_out_array:
 
         if speech not in old_speech_out_array:      
             output_array.append(speech)
 
-            print(speech + '\n')
             if speech_flag is True:
                 speech = Speech(speech_out_str, LANG)
                 speech.play(sox_effects)
-        print('\n\n')
     return output_array
 
 def detect_face(self, frame):
@@ -233,7 +229,7 @@ def get_label_for_person(self, faces, labels, tracker_bbox):
         face_x2 = face_x1 + face_w
         face_y2 = face_y1 + face_h
 
-        if face_x1 > tracker_bbox[0] and face_y1 > tracker_bbox[1] and face_x2 < tracker_bbox[2] and face_y2 < tracker_bbox[3]:
+        if face_x1 >= tracker_bbox[0] and face_y1 >= tracker_bbox[1] and face_x2 <= tracker_bbox[2] and face_y2 <= tracker_bbox[3]:
             return label_to_name[str(labels[i])]
         i += 1
     return None
@@ -298,14 +294,13 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
         temp = 1
 
         frame_grayscale = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-        if previous_frame is not None:
-            temp = self.background_subtraction(previous_frame, frame_grayscale, min_area)
+        #if previous_frame is not None:
+        #    temp = self.background_subtraction(previous_frame, frame_grayscale, min_area)
 
-        if temp==1:     
-            faces = self.detect_face(frame_grayscale)
-            if len(faces) > 0:
-                labels, confs = self.recognize_face(im, faces)
-                frame_face_processed = self.put_label_on_face(imgcv, faces, labels, confs)
+        #if temp==1:     
+        faces = self.detect_face(frame_grayscale)
+        if len(faces) > 0:
+            labels, confs = self.recognize_face(im, faces)
 
         end = current_milli_time()
         time_elapsed = (end - start) / 1000
@@ -328,8 +323,6 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
                     0, 1e-3 * h, colors[max_indx],thick//3)
     else:
         detections = []
-        detections_for_sort = []
-        labels_for_detections = {}
         scores = []
 
         global old_tracked_objects
@@ -448,7 +441,7 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
             #TODO: remove this
             #print("object detection and speech took: " + str(time_elapsed))
 
-            if self.FLAGS.upload:
+            if self.FLAGS.upload and len(speech_actions) > 0:
                 socketio_json = {
                     "isStart": False,
                     "isEnd": False,
