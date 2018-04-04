@@ -27,7 +27,12 @@ class TFNet(object):
 	_get_fps = help._get_fps
 	say = help.say
 	train = flow.train
-	camera = help.camera
+	start_video = help.start_video
+
+	setup_camera = help.setup_camera
+	process_frame = help.process_frame
+	teardown_camera = help.teardown_camera
+
 	predict = flow.predict
 	return_predict = flow.return_predict
 	to_darknet = help.to_darknet

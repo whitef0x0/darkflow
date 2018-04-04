@@ -1,4 +1,4 @@
-import numpy as np
+
 import math
 import cv2
 import os
@@ -7,23 +7,27 @@ import json
 from socketIO_client import SocketIO, LoggingNamespace
 import time
 import uuid
+from time import time as timer
 
-current_milli_time = lambda: int(round(time.time() * 1000))
+current_milli_time = lambda: int(round(timer() * 1000))
 
 font = cv2.FONT_HERSHEY_SIMPLEX
 face_cascade = cv2.CascadeClassifier('./cv2_data/haar_cascades/haarcascade_frontalface_default.xml')
 recognizer = cv2.face.LBPHFaceRecognizer_create()
-recognizer.read("./cv2_data/face_recog/david_model.yaml")
+recognizer.read("./cv2_data/face_recog/david_helen_model.yaml")
 
 from ...net.detect_sidewalk import run_sidewalk_detection
 from ...utils.box import BoundBox
 from ...cython_utils.cy_yolo2_findboxes import box_constructor
 from google_speech import Speech
+import numpy as np
+
 LANG = "en"
 sox_effects = ("speed", "1.5")
 
 label_to_name = {
-    "1": "David Baldwin"
+    "1": "David Baldwin",
+    "2": "Helen Zhang"
 }
 
 ds = True
@@ -70,6 +74,7 @@ tracked_objects = {}
 
 def object_detection_speech(speech_flag, new_objects, old_objects, height, width):
     object_changes = find_object_changes(old_objects, new_objects)
+    print("generated object_changes")
     return speak_object_changes(speech_flag, object_changes, height, width)
 
 def find_object_changes(old_objects, new_objects):
@@ -152,6 +157,7 @@ def speak_object_changes(speech_flag, object_changes, height, width):
         speech_out_array.append(speech_out_str)
     
     output_array = []
+    print("len(speech_out_array): " + str(len(speech_out_array)))
     for speech in speech_out_array:
 
         if speech not in old_speech_out_array:      
@@ -258,7 +264,14 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
     """
     Takes net output, draw net_out, save to disk
     """
+    start = current_milli_time()
     boxes = self.findboxes(net_out)
+    end = current_milli_time()
+
+    time_elapsed = (end - start) / 1000
+    #TODO: remove this
+    #print("self.findboxes(net_out) took: {}".format(time_elapsed))
+
     # meta
     meta = self.meta
     nms_max_overlap = 0.1
@@ -266,10 +279,7 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
     colors = meta['colors']
     labels = meta['labels']
     if type(im) is not np.ndarray:
-        if self.FLAGS.grayscale:
-            im = cv2.imread(im, 0)
-        else:
-            im = cv2.imread(im)
+        im = cv2.imread(im)
     else: imgcv = im
     h, w, _ = imgcv.shape
     thick = int((h + w) // 300)
@@ -282,17 +292,26 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
     labels = []
 
     if self.FLAGS.face_recognition:
+        start = current_milli_time()
+
         min_area=(3000/800)*im.shape[1] 
+        temp = 1
+
         frame_grayscale = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-        temp = self.background_subtraction(previous_frame, frame_grayscale, min_area)
+        if previous_frame is not None:
+            temp = self.background_subtraction(previous_frame, frame_grayscale, min_area)
+
         if temp==1:     
             faces = self.detect_face(frame_grayscale)
             if len(faces) > 0:
                 labels, confs = self.recognize_face(im, faces)
                 frame_face_processed = self.put_label_on_face(imgcv, faces, labels, confs)
-        
 
-    if not self.FLAGS.track :
+        end = current_milli_time()
+        time_elapsed = (end - start) / 1000
+        #TODO: remove this
+        #print("face_recognition of single frame took: " + str(time_elapsed))
+    if not self.FLAGS.track:
         for b in boxes:
             boxResults = self.process_box(b, h, w, threshold)
             if boxResults is None:
@@ -318,6 +337,7 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
         old_tracked_objects = tracked_objects
         tracked_objects = {}
 
+        start = current_milli_time()
         for b in boxes:
             boxResults = self.process_box(b, h, w, threshold)
             if boxResults is None:
@@ -325,19 +345,22 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
             left, right, top, bot, label, max_indx, confidence = boxResults
             bbox = [left, top, right, bot]
 
-            if label not in self.FLAGS.trackObj :
+            if label not in self.FLAGS.trackObj:
               continue
             if self.FLAGS.tracker == "deep_sort":
                 detections.append(np.array([left,top,right-left,bot-top]).astype(np.float64))
                 scores.append(confidence)
             elif self.FLAGS.tracker == "sort":
-                detections.append(np.array([left,top,right,bot]).astype(np.float64))
-                detections_for_sort.append(np.array([left, top, right, bot, confidence, label], dtype=object))
+                detections.append(np.array([left, top, right, bot, confidence, label], dtype=object))
+        end = current_milli_time()
+
+        time_elapsed = (end - start) / 1000
+        #TODO: remove this
+        #print("running self.process_box on all detections took: {}".format(time_elapsed))
         if len(detections) < 3  and self.FLAGS.BK_MOG:
             detections = detections + extract_boxes(self,mask)
 
         detections = np.array(detections)
-        detections_for_sort = np.array(detections_for_sort)
 
         if detections.shape[0] == 0 :
             return imgcv
@@ -356,9 +379,16 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
             tracker.update(detections)
             trackers = tracker.tracks
         elif self.FLAGS.tracker == "sort" and tracker != None:
-            trackers = tracker.update(detections_for_sort)
+            start = current_milli_time()
+            trackers = tracker.update(detections)
+            end = current_milli_time()
+
+            time_elapsed = (end - start) / 1000
+            #TODO: remove this
+            #print("sort_tracker.update(detections) took: {}".format(time_elapsed))
 
         if tracker != None:
+            start = current_milli_time()
             for track in trackers:
                 label = ''
                 bbox = []
@@ -404,24 +434,34 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
                     cv2.rectangle(imgcv, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),
                                     (255,255,255), thick//3)
                     cv2.putText(imgcv, label, (int(bbox[0]), int(bbox[1]) - 12),0, 1e-3 * h, (255,255,255),thick//6)
+            end = current_milli_time()
 
-            if self.FLAGS.speech:
-                speech_actions = object_detection_speech(self.FLAGS.speech, tracked_objects, old_tracked_objects, h, w)
+            time_elapsed = (end - start) / 1000
+            #TODO: remove this
+            #print("drawing all tracked objects took: {}".format(time_elapsed))
+
+            start = current_milli_time()
+            speech_actions = object_detection_speech(self.FLAGS.speech, tracked_objects, old_tracked_objects, h, w)
+            end = current_milli_time()
+
+            time_elapsed = (end - start) / 1000
+            #TODO: remove this
+            #print("object detection and speech took: " + str(time_elapsed))
 
             if self.FLAGS.upload:
                 socketio_json = {
                     "isStart": False,
                     "isEnd": False,
-                    "timestamp": int(round(time.time())),
+                    "timestamp": int(round(timer())),
                     "video_id": video_id,
                     "actions": speech_actions
                 }
-                with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 8080, LoggingNamespace) as socketIO:
+                with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 80, LoggingNamespace) as socketIO:
                     socketIO.emit('video_data_point', socketio_json)
 
     #Sidewalk Detection
     if self.FLAGS.sidewalk_detection:
         _, command = run_sidewalk_detection(im)
-        print("navigation command: " + command)
+        #print("navigation command: " + command)
 
     return imgcv

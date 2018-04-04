@@ -8,6 +8,10 @@ import sys
 import pyximport; pyximport.install()
 from ...cython_utils.cy_yolo_findboxes import yolo_box_constructor
 
+from time import time as timer
+
+current_milli_time = lambda: int(round(timer() * 1000))
+
 def _fix(obj, dims, scale, offs):
 	for i in range(1, 5):
 		dim = dims[(i + 1) % 2]
@@ -18,20 +22,23 @@ def _fix(obj, dims, scale, offs):
 def resize_input(self, im):
 	h, w, c = self.meta['inp_size']
 
-	if self.FLAGS.grayscale:
-		imsz = cv2.resize(im, (w, h))
-		imsz = imsz.reshape(w, h, 1)
-	else:
-		imsz = cv2.resize(im, (w, h))
-		imsz = imsz / 255.
+	start = current_milli_time()
+	imsz = cv2.resize(im, (w, h))
+	end = current_milli_time()
 
-	#TODO: Get rid of this
-	#print("imsz.shape: %s" % (imsz.shape,))
+	time_elapsed = (end - start) / 1000
+    #TODO: remove this
+	#print("imsz = cv2.resize(im, (w, h)): {}".format(time_elapsed))
 
-	if self.FLAGS.grayscale:
-		imsz = imsz[:,:]
-	else:
-		imsz = imsz[:,:,::-1]
+	start = current_milli_time()
+	imsz = imsz / 255.
+	end = current_milli_time()
+
+	time_elapsed = (end - start) / 1000
+    #TODO: remove this
+	#print("imsz = imsz / 255.: {}".format(time_elapsed))
+
+	imsz = imsz[:,:,::-1]
 	return imsz
 
 def process_box(self, b, h, w, threshold):
@@ -70,10 +77,7 @@ def preprocess(self, im, allobj = None):
 	parsed annotation (allobj) will also be modified accordingly.
 	"""
 	if type(im) is not np.ndarray:
-		if self.FLAGS.grayscale:
-			im = cv2.imread(im, 0)
-		else:
-			im = cv2.imread(im)
+		im = cv2.imread(im)
 
 	if allobj is not None: # in training mode
 		result = imcv2_affine_trans(im)

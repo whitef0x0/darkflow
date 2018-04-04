@@ -13,6 +13,7 @@ import uuid
 import requests
 import time
 from socketIO_client import SocketIO, LoggingNamespace
+current_milli_time = lambda: int(round(timer() * 1000))
 
 old_graph_msg = 'Resolving old graph def {} (no guarantee)'
 
@@ -70,9 +71,185 @@ def _get_fps(self, frame):
     processed = self.framework.postprocess(net_out, frame)
     return timer() - start
 
-def camera(self):
-    file = 'camera'
+def setup_camera(self):
+    if self.FLAGS.track :
+        if self.FLAGS.tracker == "deep_sort":
+            from deep_sort import generate_detections
+            from deep_sort.deep_sort import nn_matching
+            from deep_sort.deep_sort.tracker import Tracker
+            metric = nn_matching.NearestNeighborDistanceMetric(
+            "cosine", 0.2, 100)
+            self.tracker = Tracker(metric)
+            self.encoder = generate_detections.create_box_encoder(
+                os.path.abspath("deep_sort/resources/networks/mars-small128.ckpt-68577"))
+        elif self.FLAGS.tracker == "sort":
+            from sort import sort
+            self.encoder = None
+            self.tracker = sort.Sort()
+    if self.FLAGS.BK_MOG and self.FLAGS.track :
+        fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
 
+    self.camera = cv2.VideoCapture(0)
+    cam_h2w = 720/1280
+    expected_width = 640
+    expected_height = expected_width * cam_h2w
+    self.camera.set(3,expected_height)
+    self.camera.set(4,expected_width)
+
+    assert self.camera.isOpened(), 'Cannot capture source'
+
+    f = None
+    writer = None
+
+    cv2.startWindowThread()
+    cv2.namedWindow('LiveFeed', 0)
+    _, frame = self.camera.read()
+    self.frame_height, self.frame_width, _ = frame.shape
+    cv2.resizeWindow('LiveFeed', self.frame_width, self.frame_height)
+
+    if self.FLAGS.saveVideo:
+        self.videoWriter = cv2.VideoWriter('output_video.mov', -1, 2, (self.frame_width, self.frame_height))
+
+    # buffers for demo in batch
+    self.buffer_inp = list()
+    self.buffer_pre = list()
+
+    self.elapsed = 0
+    self.fps_start = timer()
+    self.video_id = str(uuid.uuid4())
+
+    if self.FLAGS.upload:
+        socketio_json = {
+            "isStart": True,
+            "isEnd": False,
+            "timestamp": int(round(time.time())),
+            "video_id": self.video_id,
+            "actions": []
+        }
+        with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 80, LoggingNamespace) as socketIO:
+            socketIO.emit('video_data_point', socketio_json)
+
+    self.frame_grayscale = None
+    self.n = 0
+
+    return self.camera
+
+def process_frame(self):
+    self.elapsed += 1
+    _, frame = self.camera.read()
+
+    if frame is None:
+        return True
+    if self.FLAGS.skip != self.n :
+        self.n+=1
+        return False
+
+    previous_frame = self.frame_grayscale
+    self.frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    self.n = 0
+    if self.FLAGS.BK_MOG and self.FLAGS.track :
+        fgmask = fgbg.apply(frame)
+    else:
+        fgmask = None
+
+    start = current_milli_time()
+
+    preprocessed = self.framework.preprocess(frame)
+
+    end = current_milli_time()
+    time_elapsed = (end - start) / 1000
+    #TODO: remove this
+    #print("self.framework.preprocess(...) took: {}".format(time_elapsed))
+
+    self.buffer_inp.append(frame)
+    self.buffer_pre.append(preprocessed)
+    # Only process and imshow when queue is full
+    if self.elapsed % self.FLAGS.queue == 0:
+        feed_dict = {self.inp: self.buffer_pre}
+        net_out = self.sess.run(self.out, feed_dict)
+        for img, single_out in zip(self.buffer_inp, net_out):
+            if not self.FLAGS.track:
+                postprocessed = self.framework.postprocess(
+                    single_out, img)
+            else:
+                start = current_milli_time()
+
+                postprocessed = self.framework.postprocess(
+                    single_out, img, self.video_id, frame_id=self.elapsed,
+                    csv_file=None, csv=None, mask=None,
+                    encoder=self.encoder, tracker=self.tracker, previous_frame=previous_frame)
+            
+                end = current_milli_time()
+                time_elapsed = (end - start) / 1000
+                #TODO: remove this
+                #print("self.framework.postprocess(...) took: {}".format(time_elapsed))
+            if self.FLAGS.display:
+                cv2.imshow('LiveFeed', postprocessed)
+
+            if self.FLAGS.saveVideo:
+                start = current_milli_time()
+
+                self.videoWriter.write(postprocessed)
+
+                end = current_milli_time()
+                time_elapsed = (end - start) / 1000
+                #TODO: remove this
+                #print("videoWriter.write(postprocessed) took: {}".format(time_elapsed))
+
+        # Clear Buffers
+        self.buffer_inp = list()
+        self.buffer_pre = list()
+
+    if self.elapsed % 5 == 0:
+        sys.stdout.write('\r')
+        sys.stdout.write('{0:3.3f} FPS'.format(
+            self.elapsed / (timer() - self.fps_start)))
+        sys.stdout.flush()
+
+    if self.FLAGS.saveVideo:
+        start = current_milli_time()
+
+        self.videoWriter.write(postprocessed)
+
+        end = current_milli_time()
+        time_elapsed = (end - start) / 1000
+        #TODO: remove this
+        #print("videoWriter.write(postprocessed) took: {}".format(time_elapsed))
+
+    #if self.FLAGS.display:
+    choice = cv2.waitKey(1)
+
+    return False
+
+def teardown_camera(self):
+    if self.FLAGS.upload:
+        socketio_json = {
+            "isStart": False,
+            "isEnd": True,
+            "timestamp": int(round(time.time())),
+            "video_id": self.video_id,
+            "actions": []
+        }
+        with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 80, LoggingNamespace) as socketIO:
+            socketIO.emit('video_data_point', socketio_json)
+
+    sys.stdout.write('\n')
+
+    if self.FLAGS.saveVideo:
+        self.videoWriter.release()
+
+    if self.FLAGS.upload:
+        url = 'http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com/video_stream/' + self.video_id
+        files = {'file': open('output_video.mov', 'rb')}
+        r = requests.post(url, files=files)
+        os.remove('output_video.mov')
+
+    self.camera.release()
+    if self.FLAGS.display :
+        cv2.destroyAllWindows()
+
+def start_video(self, start_camera):
     if self.FLAGS.track :
         if self.FLAGS.tracker == "deep_sort":
             from deep_sort import generate_detections
@@ -90,49 +267,35 @@ def camera(self):
     if self.FLAGS.BK_MOG and self.FLAGS.track :
         fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
 
-    if file == 'camera':
-        file = 0
-    else:
-        assert os.path.isfile(file), \
-        'file {} does not exist'.format(file)
+    camera = cv2.VideoCapture(0)
+    cam_h2w = 720/1280
+    expected_width = 640
+    expected_height = expected_width * cam_h2w
+    camera.set(3,expected_height)
+    camera.set(4,expected_width)
 
-    camera = cv2.VideoCapture(file)
-    camera.set(3,960)
-    camera.set(4,540)
+    self.say('Press [ESC] to quit video')
 
-    if file == 0:
-        self.say('Press [ESC] to quit video')
+    assert camera.isOpened(), 'Cannot capture source'
 
-    assert camera.isOpened(), \
-    'Cannot capture source'
+    f = None
+    writer = None
 
-    if self.FLAGS.csv :
-        f = open('{}.csv'.format(file),'w')
-        writer = csv.writer(f, delimiter=',')
-        writer.writerow(['frame_id', 'track_id' , 'x', 'y', 'w', 'h'])
-        f.flush()
-    else :
-        f =None
-        writer= None
-
-    if file == 0: #camera window
-        cv2.namedWindow('', 0)
-        _, frame = camera.read()
-        height, width, _ = frame.shape
-        cv2.resizeWindow('', width, height)
-    else:
-        _, frame = camera.read()
-        height, width, _ = frame.shape
+    cv2.startWindowThread()
+    cv2.namedWindow('LiveFeed', 0)
+    _, frame = camera.read()
+    height, width, _ = frame.shape
+    cv2.resizeWindow('LiveFeed', width, height)
 
     if self.FLAGS.saveVideo:
-        videoWriter = cv2.VideoWriter('output_video.mov', -1, 2, (width, height))
+        self.videoWriter = cv2.VideoWriter('output_video.mov', -1, 2, (width, height))
 
     # buffers for demo in batch
     buffer_inp = list()
     buffer_pre = list()
 
     elapsed = 0
-    start = timer()
+    fps_start = timer()
     self.say('Press [ESC] to quit demo')
 
     # Loop through frames
@@ -170,7 +333,16 @@ def camera(self):
             fgmask = fgbg.apply(frame)
         else :
             fgmask = None
+
+        start = current_milli_time()
+
         preprocessed = self.framework.preprocess(frame)
+
+        end = current_milli_time()
+        time_elapsed = (end - start) / 1000
+        #TODO: remove this
+        #print("self.framework.preprocess(...) took: {}".format(time_elapsed))
+
         buffer_inp.append(frame)
         buffer_pre.append(preprocessed)
         # Only process and imshow when queue is full
@@ -182,15 +354,30 @@ def camera(self):
                     postprocessed = self.framework.postprocess(
                         single_out, img)
                 else:
+                    start = current_milli_time()
+
                     postprocessed = self.framework.postprocess(
                         single_out, img, video_id, frame_id=elapsed,
                         csv_file=f, csv=writer, mask=fgmask,
                         encoder=encoder, tracker=tracker, previous_frame=previous_frame)
+                
+                    end = current_milli_time()
+                    time_elapsed = (end - start) / 1000
+                    #TODO: remove this
+                    #print("self.framework.postprocess(...) took: {}".format(time_elapsed))
+                if self.FLAGS.display:
+                    cv2.imshow('LiveFeed', postprocessed)
+
                 if self.FLAGS.saveVideo:
+                    start = current_milli_time()
+
                     videoWriter.write(postprocessed)
 
-                if self.FLAGS.display:
-                    cv2.imshow('', postprocessed)
+                    end = current_milli_time()
+                    time_elapsed = (end - start) / 1000
+                    #TODO: remove this
+                    #print("videoWriter.write(postprocessed) took: {}".format(time_elapsed))
+
             # Clear Buffers
             buffer_inp = list()
             buffer_pre = list()
@@ -198,8 +385,15 @@ def camera(self):
         if elapsed % 5 == 0:
             sys.stdout.write('\r')
             sys.stdout.write('{0:3.3f} FPS'.format(
-                elapsed / (timer() - start)))
+                elapsed / (timer() - fps_start)))
             sys.stdout.flush()
+
+        if self.FLAGS.display :
+            choice = cv2.waitKey(1)
+
+            #Check if we should quit
+            if choice == 27: break
+
 
     if self.FLAGS.upload:
         socketio_json = {
@@ -223,6 +417,7 @@ def camera(self):
         r = requests.post(url, files=files)
         os.remove('output_video.mov')
 
+    camera.release()
     if self.FLAGS.csv :
         f.close()
     if self.FLAGS.display :
