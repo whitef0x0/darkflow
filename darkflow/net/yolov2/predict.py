@@ -22,9 +22,11 @@ from ...cython_utils.cy_yolo2_findboxes import box_constructor
 from google_speech import Speech
 import numpy as np
 
+#Default values for google text-to-speech
 LANG = "en"
 sox_effects = ("speed", "1.5")
 
+#Labels that map names to OpenCV labels
 label_to_name = {
     "1": "David Baldwin",
     "2": "Helen Zhang"
@@ -47,6 +49,7 @@ def _softmax(x):
     out = e_x / e_x.sum()
     return out
 
+#Find bounding boxes given a net
 def findboxes(self, net_out):
     # meta
     meta = self.meta
@@ -54,7 +57,7 @@ def findboxes(self, net_out):
     boxes=box_constructor(meta,net_out)
     return boxes
 
-
+#Extract boxes into cv shapes
 def extract_boxes(self,new_im):
     cont = []
     new_im=new_im.astype(np.uint8)
@@ -72,10 +75,12 @@ def extract_boxes(self,new_im):
 
 tracked_objects = {}
 
+#Generate Speech Text for the current frame and play them using Google's TTS API 
 def object_detection_speech(speech_flag, new_objects, old_objects, height, width):
     object_changes = find_object_changes(old_objects, new_objects)
     return speak_object_changes(speech_flag, object_changes, height, width)
 
+#Find all positional changes for objects between current frame and previous
 def find_object_changes(old_objects, new_objects):
     object_changes = {}
 
@@ -107,6 +112,7 @@ def find_object_changes(old_objects, new_objects):
 
     return object_changes
 
+#Convert object positional change to words
 def get_object_position_words(bBox, height, width):
     position_words = ""
     centered = False
@@ -134,6 +140,7 @@ def get_object_position_words(bBox, height, width):
 speech_out_array = []
 old_speech_out_array = []
 
+#Play object change sentences using Google's TTS API
 def speak_object_changes(speech_flag, object_changes, height, width):
     global speech_out_array
     global old_speech_out_array
@@ -166,6 +173,7 @@ def speak_object_changes(speech_flag, object_changes, height, width):
                 speech.play(sox_effects)
     return output_array
 
+#Detect Faces in an image using OpenCV's faceRecognizer
 def detect_face(self, frame):
     """
     detect human faces in image using haar-cascade
@@ -177,6 +185,7 @@ def detect_face(self, frame):
     faces = face_cascade.detectMultiScale(frame, 1.1, 2, 0, (20, 20) )
     return faces
 
+#Classify Faces with labels (trained from opencv2_data)
 def recognize_face(self, frame_orginal, faces):
     """
     recognize human faces using LBPH features
