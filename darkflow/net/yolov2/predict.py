@@ -12,7 +12,7 @@ from time import time as timer
 current_milli_time = lambda: int(round(timer() * 1000))
 
 font = cv2.FONT_HERSHEY_SIMPLEX
-face_cascade = cv2.CascadeClassifier('./cv2_data/haar_cascades/haarcascade_frontalface_default.xml')
+face_cascade = cv2.CascadeClassifier("./cv2_data/haar_cascades/haarcascade_frontalface_default.xml")
 recognizer = cv2.face.LBPHFaceRecognizer_create()
 recognizer.read("./cv2_data/face_recog/david_helen_model.yaml")
 
@@ -192,8 +192,10 @@ def recognize_face(self, frame_orginal, faces):
         frame_orginal_grayscale = cv2.cvtColor(frame_orginal[y: y + h, x: x + w], cv2.COLOR_BGR2GRAY)
         predict_tuple = recognizer.predict(frame_orginal_grayscale)
         a, b = predict_tuple
-        predict_label.append(a)
-        predict_conf.append(b)
+
+        if b > 0.5:
+            predict_label.append(a)
+            predict_conf.append(b)
     return predict_label, predict_conf
 
 def put_label_on_face(self, frame, faces, labels, confs):
@@ -256,7 +258,7 @@ def background_subtraction(self, previous_frame, frame_resized_grayscale, min_ar
     return temp     
 
 
-def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mask = None,encoder=None,tracker=None, previous_frame=None):
+def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mask = None,encoder=None,tracker=None, previous_frame=None, disable_facial=False):
     """
     Takes net output, draw net_out, save to disk
     """
@@ -271,9 +273,9 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
     # meta
     meta = self.meta
     nms_max_overlap = 0.1
-    threshold = meta['thresh']
-    colors = meta['colors']
-    labels = meta['labels']
+    threshold = meta["thresh"]
+    colors = meta["colors"]
+    labels = meta["labels"]
     if type(im) is not np.ndarray:
         im = cv2.imread(im)
     else: imgcv = im
@@ -283,29 +285,31 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
 
 
     #Face Detection Code
-    label_person_name = ''
+    label_person_name = ""
     faces = []
     labels = []
 
-    if self.FLAGS.face_recognition:
+    if self.FLAGS.face_recognition and not disable_facial:
         start = current_milli_time()
 
-        min_area=(3000/800)*im.shape[1] 
-        temp = 1
+        # min_area=(3000/800)*im.shape[1] 
+        # temp = 1
 
         frame_grayscale = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-        #if previous_frame is not None:
+        # if previous_frame is not None:
         #    temp = self.background_subtraction(previous_frame, frame_grayscale, min_area)
 
-        #if temp==1:     
+        # if temp==1:     
         faces = self.detect_face(frame_grayscale)
         if len(faces) > 0:
-            labels, confs = self.recognize_face(im, faces)
+            labels, confs = self.recognize_face(imgcv, faces)
+            self.put_label_on_face(im, faces, labels, confs)
 
         end = current_milli_time()
         time_elapsed = (end - start) / 1000
         #TODO: remove this
         #print("face_recognition of single frame took: " + str(time_elapsed))
+    speech_actions = None
     if not self.FLAGS.track:
         for b in boxes:
             boxResults = self.process_box(b, h, w, threshold)
@@ -313,7 +317,7 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
                 continue
             left, right, top, bot, label, max_indx, confidence = boxResults
             if self.FLAGS.json:
-                resultsForJSON.append({"label": label, "confidence": float('%.2f' % confidence), "topleft": {"x": left, "y": top}, "bottomright": {"x": right, "y": bot}})
+                resultsForJSON.append({"label": label, "confidence": float("%.2f" % confidence), "topleft": {"x": left, "y": top}, "bottomright": {"x": right, "y": bot}})
                 continue
             if self.FLAGS.display:
                 cv2.rectangle(imgcv,
@@ -356,7 +360,7 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
         detections = np.array(detections)
 
         if detections.shape[0] == 0 :
-            return imgcv
+            return imgcv, None
         if self.FLAGS.tracker == "deep_sort" and tracker != None:
             scores = np.array(scores)
             features = encoder(imgcv, detections.copy())
@@ -383,7 +387,7 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
         if tracker != None:
             start = current_milli_time()
             for track in trackers:
-                label = ''
+                label = ""
                 bbox = []
                 if self.FLAGS.tracker == "deep_sort":
                     if not track.is_confirmed() or track.time_since_update > 1:
@@ -399,7 +403,7 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
                     csv.writerow([frame_id,id_num,int(bbox[0]),int(bbox[1]),int(bbox[2])-int(bbox[0]),int(bbox[3])-int(bbox[1])])
                     csv_file.flush()
 
-                object_key = label + ' ' + id_num
+                object_key = label + " " + id_num
                 tracked_objects[object_key] = {
                     "bbox": {
                         "topleft": {
@@ -441,6 +445,15 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
             #TODO: remove this
             #print("object detection and speech took: " + str(time_elapsed))
 
+            if len(speech_actions) > 0:
+                speech_actions = {
+                    "isStart": False,
+                    "isEnd": False,
+                    "timestamp": int(round(timer())),
+                    "video_id": video_id,
+                    "actions": speech_actions
+                }
+
             if self.FLAGS.upload and len(speech_actions) > 0:
                 socketio_json = {
                     "isStart": False,
@@ -449,12 +462,12 @@ def postprocess(self,net_out,im,video_id,frame_id = 0,csv_file=None,csv=None,mas
                     "video_id": video_id,
                     "actions": speech_actions
                 }
-                with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 80, LoggingNamespace) as socketIO:
-                    socketIO.emit('video_data_point', socketio_json)
+                with SocketIO("http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com", 80, LoggingNamespace) as socketIO:
+                    socketIO.emit("video_data_point", socketio_json)
 
     #Sidewalk Detection
     if self.FLAGS.sidewalk_detection:
         _, command = run_sidewalk_detection(im)
         #print("navigation command: " + command)
 
-    return imgcv
+    return imgcv, speech_actions

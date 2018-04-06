@@ -6,8 +6,6 @@ import math
 from scipy.optimize import curve_fit
 
 
-cap = cv2.VideoCapture("challenge.mp4")
-
 #Check slope for navigation
 def checkSlope(x1,y1,x2,y2):
     if not(x1 == x2):

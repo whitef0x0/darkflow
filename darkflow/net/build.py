@@ -33,6 +33,9 @@ class TFNet(object):
 	process_frame = help.process_frame
 	teardown_camera = help.teardown_camera
 
+	generate_video_id = help.generate_video_id
+	get_video_id = help.get_video_id
+
 	predict = flow.predict
 	return_predict = flow.return_predict
 	to_darknet = help.to_darknet

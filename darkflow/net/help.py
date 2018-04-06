@@ -71,6 +71,12 @@ def _get_fps(self, frame):
     processed = self.framework.postprocess(net_out, frame)
     return timer() - start
 
+def get_video_id(self):
+    return self.video_id
+
+def generate_video_id(self):
+    self.video_id = str(uuid.uuid4())
+
 def setup_camera(self):
     self.video_id = str(uuid.uuid4())
 
@@ -91,23 +97,10 @@ def setup_camera(self):
     if self.FLAGS.BK_MOG and self.FLAGS.track :
         fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
 
-    self.camera = cv2.VideoCapture(0)
-    cam_h2w = 720/1280
-    expected_width = 640
-    expected_height = expected_width * cam_h2w
-    self.camera.set(3,expected_height)
-    self.camera.set(4,expected_width)
-
-    assert self.camera.isOpened(), 'Cannot capture source'
-
     f = None
     writer = None
 
-    cv2.startWindowThread()
-    cv2.namedWindow('LiveFeed', 0)
-    _, frame = self.camera.read()
-    self.frame_height, self.frame_width, _ = frame.shape
-    cv2.resizeWindow('LiveFeed', self.frame_width, self.frame_height)
+    cv2.namedWindow('LiveFeed', cv2.WINDOW_AUTOSIZE)
 
     if self.FLAGS.saveVideo:
         self.videoWriter = cv2.VideoWriter('output_video.mov', -1, 2, (self.frame_width, self.frame_height))
@@ -130,23 +123,19 @@ def setup_camera(self):
         with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 80, LoggingNamespace) as socketIO:
             socketIO.emit('video_data_point', socketio_json)
 
-    self.frame_grayscale = None
     self.n = 0
 
-    return self.camera
-
-def process_frame(self):
+def process_frame(self, frame, previous_frame, disable_facial=False):
     self.elapsed += 1
-    _, frame = self.camera.read()
 
     if frame is None:
         return True
     if self.FLAGS.skip != self.n :
         self.n+=1
-        return False
+        return False, None
 
-    previous_frame = self.frame_grayscale
-    self.frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    if previous_frame is not None:
+        previous_frame = cv2.cvtColor(previous_frame, cv2.COLOR_BGR2GRAY)
 
     self.n = 0
     if self.FLAGS.BK_MOG and self.FLAGS.track :
@@ -163,6 +152,9 @@ def process_frame(self):
     #TODO: remove this
     #print("self.framework.preprocess(...) took: {}".format(time_elapsed))
 
+    postprocessed = None
+    speech_actions = None
+
     self.buffer_inp.append(frame)
     self.buffer_pre.append(preprocessed)
     # Only process and imshow when queue is full
@@ -170,24 +162,20 @@ def process_frame(self):
         feed_dict = {self.inp: self.buffer_pre}
         net_out = self.sess.run(self.out, feed_dict)
         for img, single_out in zip(self.buffer_inp, net_out):
-            postprocessed = None
             if not self.FLAGS.track:
                 postprocessed = self.framework.postprocess(
                     single_out, img)
             else:
                 start = current_milli_time()
 
-                postprocessed = self.framework.postprocess(
-                    single_out, img, self.video_id, frame_id=self.elapsed,
-                    csv_file=None, csv=None, mask=None,
-                    encoder=self.encoder, tracker=self.tracker, previous_frame=previous_frame)
+                postprocessed, speech_actions = self.framework.postprocess(single_out, img, self.video_id, frame_id=self.elapsed, csv_file=None, csv=None, mask=None, encoder=self.encoder, tracker=self.tracker, previous_frame=previous_frame, disable_facial=disable_facial)
             
                 end = current_milli_time()
                 time_elapsed = (end - start) / 1000
                 #TODO: remove this
                 #print("self.framework.postprocess(...) took: {}".format(time_elapsed))
 
-            if self.FLAGS.saveVideo:
+            if self.FLAGS.saveVideo and not disable_facial:
                 start = current_milli_time()
 
                 self.videoWriter.write(postprocessed)
@@ -197,7 +185,7 @@ def process_frame(self):
                 #TODO: remove this
                 #print("videoWriter.write(postprocessed) took: {}".format(time_elapsed))
 
-            if self.FLAGS.display:
+            if self.FLAGS.display and disable_facial is not True:
                 cv2.imshow('LiveFeed', postprocessed)
 
         # Clear Buffers
@@ -210,7 +198,7 @@ def process_frame(self):
             self.elapsed / (timer() - self.fps_start)))
         sys.stdout.flush()
 
-    if self.FLAGS.saveVideo:
+    if self.FLAGS.saveVideo and not disable_facial:
         start = current_milli_time()
 
         self.videoWriter.write(postprocessed)
@@ -220,10 +208,10 @@ def process_frame(self):
         #TODO: remove this
         #print("videoWriter.write(postprocessed) took: {}".format(time_elapsed))
 
-    #if self.FLAGS.display:
-    choice = cv2.waitKey(1)
+    if self.FLAGS.display and not disable_facial:
+        choice = cv2.waitKey(1)
 
-    return False
+    return False, speech_actions
 
 def teardown_camera(self):
     if self.FLAGS.upload:
@@ -316,7 +304,8 @@ def camera(self):
         with SocketIO('http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com', 80, LoggingNamespace) as socketIO:
             socketIO.emit('video_data_point', socketio_json)
 
-    frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    frame_grayscale = None
+
     while camera.isOpened():
         elapsed += 1
         _, frame = camera.read()
@@ -418,7 +407,7 @@ def camera(self):
         url = 'http://ec2-18-191-1-128.us-east-2.compute.amazonaws.com/video_stream/' + video_id
         files = {'file': open('output_video.mov', 'rb')}
         r = requests.post(url, files=files)
-        #os.remove('output_video.mov')
+        os.remove('output_video.mov')
 
     camera.release()
     if self.FLAGS.csv :
