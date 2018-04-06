@@ -5,7 +5,6 @@ from os.path import basename
 
 class framework(object):
     constructor = vanilla.constructor
-    loss = vanilla.train.loss
 
     def __init__(self, meta, FLAGS):
         model = basename(meta['model'])
@@ -23,7 +22,6 @@ class YOLO(framework):
     shuffle = yolo.data.shuffle
     preprocess = yolo.predict.preprocess
     postprocess = yolo.predict.postprocess
-    loss = yolo.train.loss
     is_inp = yolo.misc.is_inp
     profile = yolo.misc.profile
     _batch = yolo.data._batch
@@ -42,7 +40,6 @@ class YOLOv2(framework):
     parse = yolo.data.parse
     shuffle = yolov2.data.shuffle
     preprocess = yolo.predict.preprocess
-    loss = yolov2.train.loss
     is_inp = yolo.misc.is_inp
     postprocess = yolov2.predict.postprocess
     _batch = yolov2.data._batch
